@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            user-select: none;
+        }
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            position: relative;
+            max-width: 340px;
+            min-width: 280px;
+            background: linear-gradient(135deg, rgba(35, 35, 45, 0.97), rgba(25, 25, 35, 0.97));
+            border: 1px solid rgba(100, 180, 255, 0.3);
+            border-radius: 12px;
+            padding: 14px 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 16px rgba(100, 180, 255, 0.12);
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideIn 0.35s ease-out;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .toast:hover {
+            transform: translateX(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(100, 180, 255, 0.22);
+            border-color: rgba(100, 180, 255, 0.5);
+        }
+        .toast.fade-out {
+            opacity: 0;
+            transform: translateX(100px);
+            transition: all 0.3s ease-in;
+        }
+        .toast-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .toast-icon { font-size: 20px; flex-shrink: 0; }
+        .toast-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            flex: 1;
+            line-height: 1.4;
+        }
+        .toast-time {
+            font-size: 10px;
+            color: #777;
+            flex-shrink: 0;
+        }
+        .toast-content {
+            font-size: 12px;
+            color: #bbb;
+            line-height: 1.5;
+            margin-left: 30px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .toast-dismiss {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            border: none;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+            color: #888;
+            font-size: 14px;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+            padding: 0;
+            transition: all 0.2s;
+        }
+        .toast-dismiss:hover {
+            background: rgba(255,80,80,0.3);
+            color: #ff6b6b;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(80px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+    <div id="toast-container"></div>
+    <script>
+        const TOAST_MAX_W = 360;
+        const TOAST_PADDING_BOTTOM = 20;
+
+        const iconMap = {
+            'reminder_triggered': '🔔',
+            'task_completed': '✅',
+            'task_failed': '❌',
+            'task_started': '🚀',
+            'system_notify': 'ℹ️',
+        };
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+
+        function formatTime(timeStr) {
+            if (!timeStr) return '';
+            try {
+                const date = new Date(timeStr);
+                const now = new Date();
+                const diff = now - date;
+                if (diff < 60000) return '刚刚';
+                if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+                if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+                return date.toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+            } catch (e) { return ''; }
+        }
+
+        function requestResize() {
+            const container = document.getElementById('toast-container');
+            if (!container || !window.toastAPI || !window.toastAPI.resizeToast) return;
+            if (container.children.length === 0) {
+                window.toastAPI.resizeToast(TOAST_MAX_W, 0);
+                return;
+            }
+            // 获取容器实际渲染高度
+            const rect = container.getBoundingClientRect();
+            const h = Math.ceil(rect.height) + TOAST_PADDING_BOTTOM;
+            window.toastAPI.resizeToast(TOAST_MAX_W, h);
+        }
+
+        function showNotification(notification) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.dataset.id = notification.id;
+
+            const icon = iconMap[notification.notification_type] || '📢';
+            const time = notification.created_at ? formatTime(notification.created_at) : '';
+
+            toast.innerHTML = `
+                <button class="toast-dismiss" title="关闭">×</button>
+                <div class="toast-header">
+                    <span class="toast-icon">${icon}</span>
+                    <span class="toast-title">${escapeHtml(notification.title)}</span>
+                    <span class="toast-time">${time}</span>
+                </div>
+                <div class="toast-content">${escapeHtml(notification.content || '')}</div>
+            `;
+
+            function closeToast() {
+                if (toast.classList.contains('fade-out')) return;
+                toast.classList.add('fade-out');
+                setTimeout(() => {
+                    toast.remove();
+                    requestResize();
+                }, 300);
+            }
+
+            function dismissToast() {
+                if (toast.classList.contains('fade-out')) return;
+                toast.classList.add('fade-out');
+                setTimeout(() => {
+                    toast.remove();
+                    requestResize();
+                    if (window.toastAPI) {
+                        window.toastAPI.onToastClicked(notification.id);
+                    }
+                }, 300);
+            }
+
+            toast.querySelector('.toast-dismiss').addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeToast();
+            });
+
+            toast.addEventListener('click', (e) => {
+                if (e.target.closest('.toast-dismiss')) return;
+                dismissToast();
+            });
+
+            container.appendChild(toast);
+            requestAnimationFrame(() => requestResize());
+        }
+
+        // 暴露 API 给 preload
+        window.showNotification = showNotification;
+
+        // 监听来自主进程的通知数据
+        if (window.toastAPI && window.toastAPI.onNotificationData) {
+            window.toastAPI.onNotificationData((notification) => {
+                showNotification(notification);
+            });
+        }
+    </script>
+</body>
+</html>

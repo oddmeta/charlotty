@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaYAY Desktop Pet</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            outline: none;
+        }
+
+        /* 圆盘菜单 */
+        #radial-menu {
+            position: fixed;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .radial-menu-center {
+            position: absolute;
+            width: var(--center-size, 60px);
+            height: var(--center-size, 60px);
+            border-radius: 50%;
+            background: rgba(100, 180, 255, 0.2);
+            border: 2px solid rgba(100, 180, 255, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: calc(var(--center-size, 60px) * 0.47);
+            box-shadow: 0 0 20px rgba(100, 180, 255, 0.4);
+            transform: translate(-50%, -50%) scale(0);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+        }
+
+        .radial-menu-center::before {
+            content: '🐾';
+        }
+
+        .radial-menu-center:hover {
+            background: rgba(100, 180, 255, 0.3);
+            box-shadow: 0 0 30px rgba(100, 180, 255, 0.6);
+        }
+
+        .radial-menu-item {
+            position: absolute;
+            width: var(--item-size, 70px);
+            height: var(--item-size, 70px);
+            border-radius: 50%;
+            background: rgba(30, 30, 30, 0.9);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+            transform: translate(-50%, -50%) scale(0);
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .radial-menu-item:hover {
+            background: rgba(100, 180, 255, 0.25);
+            border-color: rgba(100, 180, 255, 0.6);
+            box-shadow: 0 0 20px rgba(100, 180, 255, 0.5);
+            transform: translate(-50%, -50%) scale(1.15) !important;
+        }
+
+        .radial-menu-icon {
+            font-size: calc(var(--item-size, 70px) * 0.4);
+            line-height: 1;
+            pointer-events: none; /* 不阻挡点击事件 */
+        }
+
+        .radial-menu-label {
+            font-size: calc(var(--item-size, 70px) * 0.17);
+            color: #eee;
+            white-space: nowrap;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            pointer-events: none; /* 不阻挡点击事件 */
+        }
+
+        /* 圆盘菜单展开状态 */
+        #radial-menu.active .radial-menu-center {
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        #radial-menu.active .radial-menu-item:nth-child(2) {
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0.05s;
+        }
+
+        #radial-menu.active .radial-menu-item:nth-child(3) {
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0.1s;
+        }
+
+        #radial-menu.active .radial-menu-item:nth-child(4) {
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0.15s;
+        }
+
+        #radial-menu.active .radial-menu-item:nth-child(5) {
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0.2s;
+        }
+
+        #radial-menu.active .radial-menu-item:nth-child(6) {
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0.25s;
+        }
+
+        #radial-menu.active .radial-menu-item:nth-child(7) {
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0.3s;
+        }
+
+        #radial-menu.active .radial-menu-item:nth-child(8) {
+            transform: translate(-50%, -50%) scale(1);
+            transition-delay: 0.35s;
+        }
+
+        /* 右键菜单（已禁用，使用圆盘菜单替代） */
+        /*
+        #context-menu {
+            position: absolute;
+            display: none;
+            background: rgba(30, 30, 30, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 6px 0;
+            min-width: 155px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 13px;
+            color: #eee;
+        }
+
+        #context-menu .menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #context-menu .menu-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        #context-menu .menu-icon {
+            font-size: 15px;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        #context-menu .menu-separator {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 4px 0;
+        }
+        */
+
+        /* 隐藏恢复标签（360风格） */
+        #recover-tab {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(24, 24, 28, 0.92);
+            z-index: 100;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #recover-tab[data-edge="left"] {
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            background: linear-gradient(to right, rgba(20, 20, 24, 0.95), rgba(30, 30, 36, 0.8));
+        }
+        #recover-tab[data-edge="right"] {
+            border-right: none;
+            border-radius: 8px 0 0 8px;
+            background: linear-gradient(to left, rgba(20, 20, 24, 0.95), rgba(30, 30, 36, 0.8));
+        }
+        #recover-tab[data-edge="top"] {
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            background: linear-gradient(to bottom, rgba(20, 20, 24, 0.95), rgba(30, 30, 36, 0.8));
+        }
+        #recover-tab[data-edge="bottom"] {
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            background: linear-gradient(to top, rgba(20, 20, 24, 0.95), rgba(30, 30, 36, 0.8));
+        }
+
+        #recover-tab .pet-face {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(100, 180, 255, 0.15);
+            border: 1.5px solid rgba(100, 180, 255, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.25s ease;
+            user-select: none;
+            pointer-events: none;
+            filter: drop-shadow(0 0 6px rgba(100, 180, 255, 0.3));
+        }
+        #recover-tab:hover .pet-face {
+            transform: scale(1.15);
+            background: rgba(100, 180, 255, 0.25);
+            border-color: rgba(100, 180, 255, 0.6);
+        }
+
+        /* 窗口边框 */
+        body.window-border {
+            box-shadow: inset 0 0 0 2px rgba(100, 180, 255, 0.7);
+        }
+
+        /* 定时任务卡片样式 */
+        .schedule-item {
+            transition: all 0.2s ease;
+        }
+        .schedule-item:hover {
+            background: rgba(255, 255, 255, 0.06) !important;
+            border-color: rgba(100, 180, 255, 0.3) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        .schedule-item:active {
+            transform: translateY(0);
+        }
+        .schedule-toggle:hover,
+        .schedule-delete:hover {
+            filter: brightness(1.2);
+            transform: scale(1.05);
+        }
+        
+        /* 新增任务按钮样式 */
+        .schedule-add-btn:hover {
+            background: rgba(100, 180, 255, 0.15) !important;
+            border-color: rgba(100, 180, 255, 0.6) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(100, 180, 255, 0.2);
+        }
+        .schedule-add-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="recover-tab" title="点击恢复桌宠">
+        <div class="pet-face">🐾</div>
+    </div>
+
+    <!-- 圆盘菜单 -->
+    <div id="radial-menu" style="display:none;position:fixed;z-index:1000;pointer-events:none;">
+        <div class="radial-menu-center" style="pointer-events:auto;"></div>
+        <div class="radial-menu-item" data-action="markit" style="pointer-events:auto;"><span class="radial-menu-icon">📑</span><span class="radial-menu-label">书签收藏</span></div>
+        <div class="radial-menu-item" data-action="reminder" style="pointer-events:auto;"><span class="radial-menu-icon">⏰</span><span class="radial-menu-label">提醒待办</span></div>
+        <div class="radial-menu-item" data-action="schedule" style="pointer-events:auto;"><span class="radial-menu-icon">📋</span><span class="radial-menu-label">定时任务</span></div>
+        <div class="radial-menu-item" data-action="mcptools" style="pointer-events:auto;"><span class="radial-menu-icon">⚡</span><span class="radial-menu-label">技能说明</span></div>
+        <div class="radial-menu-item" data-action="settings" style="pointer-events:auto;"><span class="radial-menu-icon">⚙️</span><span class="radial-menu-label">设置</span></div>
+        <div class="radial-menu-item" data-action="auth" style="pointer-events:auto;"><span class="radial-menu-icon">🔑</span><span class="radial-menu-label">登录</span></div>
+        <div class="radial-menu-item" data-action="exit" style="pointer-events:auto;"><span class="radial-menu-icon">🚪</span><span class="radial-menu-label">退出</span></div>
+    </div>
+
+    <!-- 右键菜单（已禁用，使用圆盘菜单替代） -->
+    <!-- 如需恢复，取消下方注释 -->
+    <!--
+    <div id="context-menu">
+        <div id="menu-auth-items">
+            <div class="menu-item" id="menu-markit"><span class="menu-icon">📑</span>书签收藏</div>
+            <div class="menu-item" id="menu-reminder"><span class="menu-icon">⏰</span>提醒待办</div>
+            <div class="menu-item" id="menu-schedule"><span class="menu-icon">📋</span>定时任务</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" id="menu-mcptools"><span class="menu-icon">⚡</span>技能说明</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" id="menu-settings"><span class="menu-icon">⚙️</span>设置</div>
+            <div class="menu-separator"></div>
+        </div>
+        <div class="menu-item" id="menu-auth"><span class="menu-icon">🔑</span>登录</div>
+        <div class="menu-item" id="menu-exit"><span class="menu-icon">🚪</span>退出桌宠</div>
+    </div>
+    -->
+
+    <!-- 通用弹窗面板 -->
+    <div id="panel-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:stretch;justify-content:stretch;">
+        <div id="panel-box" style="width:100%;height:100%;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.15);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;position:relative;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span id="panel-title" style="font-size:14px;color:#eee;font-weight:500;">面板</span>
+                <span id="panel-close" style="cursor:pointer;color:#999;font-size:16px;line-height:1;">×</span>
+            </div>
+            <div id="panel-list" style="flex:1;overflow-y:auto;padding:8px 12px;font-size:12px;color:#ccc;"></div>
+            <div id="panel-form" style="flex-shrink:0;padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;gap:6px;max-height:45%;overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- 编辑提醒模态框（覆盖在列表面板之上） -->
+    <div id="edit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:600;align-items:stretch;justify-content:stretch;">
+        <div id="edit-box" style="width:100%;height:100%;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.15);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span id="edit-title" style="font-size:14px;color:#eee;font-weight:500;">编辑提醒</span>
+                <span id="edit-close" style="cursor:pointer;color:#999;font-size:16px;line-height:1;">×</span>
+            </div>
+            <div id="edit-content" style="flex:1;overflow-y:auto;padding:8px 12px;font-size:12px;color:#ccc;"></div>
+            <div id="edit-form" style="padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+    </div>
+
+    <!-- 新增定时任务独立弹窗 -->
+    <div id="schedule-add-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:650;align-items:center;justify-content:center;">
+        <div id="schedule-add-modal" style="width:600px;max-height:85vh;background:rgba(30,30,30,0.98);border:1px solid rgba(255,255,255,0.15);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(100,180,255,0.05);">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:18px;">📅</span>
+                    <span id="schedule-add-title" style="font-size:15px;color:#eee;font-weight:600;">新增定时任务</span>
+                </div>
+                <span id="schedule-add-close" style="cursor:pointer;color:#999;font-size:20px;line-height:1;padding:4px 8px;border-radius:4px;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='#999'">×</span>
+            </div>
+            <div id="schedule-add-content" style="flex:1;overflow-y:auto;padding:16px 18px;"></div>
+            <div id="schedule-add-form" style="padding:14px 18px;border-top:1px solid rgba(255,255,255,0.1);display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
+    </div>
+
+    <!-- 独立设置面板（与面板模块统一尺寸 540x640） -->
+    <div id="settings-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:550;align-items:stretch;justify-content:stretch;">
+        <div id="settings-modal" style="width:540px;height:640px;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.15);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span id="settings-title" style="font-size:14px;color:#eee;font-weight:500;">设置</span>
+                <span id="settings-close" style="cursor:pointer;color:#999;font-size:16px;line-height:1;">×</span>
+            </div>
+            <div id="settings-body" style="flex:1;display:flex;overflow:hidden;">
+                <div id="settings-nav" style="width:100px;flex-shrink:0;background:rgba(255,255,255,0.03);border-right:1px solid rgba(255,255,255,0.08);overflow-y:auto;padding:6px 0;"></div>
+                <div id="settings-content" style="flex:1;overflow-y:auto;padding:12px 14px;"></div>
+            </div>
+            <div id="settings-footer" style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1);">
+                <button id="settings-cancel-btn" style="flex:1;padding:7px 0;border-radius:4px;border:none;background:rgba(120,120,120,0.5);color:#fff;cursor:pointer;font-size:12px;">取消</button>
+                <button id="settings-reset-btn" style="flex:1;padding:7px 0;border-radius:4px;border:none;background:rgba(255,152,0,0.5);color:#fff;cursor:pointer;font-size:12px;">重置</button>
+                <button id="settings-save-btn" style="flex:1;padding:7px 0;border-radius:4px;border:none;background:rgba(76,175,80,0.7);color:#fff;cursor:pointer;font-size:12px;">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文字对话窗口（与面板模块统一尺寸 540x640） -->
+    <div id="chat-dialog" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:stretch;justify-content:stretch;">
+        <div style="width:540px;height:640px;background:rgba(30,30,30,0.95);border:1px solid rgba(255,255,255,0.15);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                <span style="font-size:14px;color:#eee;font-weight:500;">对话</span>
+                <span id="chat-dialog-close" style="cursor:pointer;color:#999;font-size:16px;line-height:1;">×</span>
+            </div>
+            <div id="chat-history" style="flex:1;overflow-y:auto;padding:8px 12px;font-size:12px;"></div>
+            <div style="padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:6px;">
+                <input id="chat-input" type="text" placeholder="输入文字..." style="flex:1;padding:7px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.15);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;outline:none;" />
+                <button id="chat-send-btn" style="padding:7px 14px;border-radius:4px;border:none;background:rgba(100,180,255,0.75);color:#fff;cursor:pointer;font-size:12px;flex-shrink:0;">发送</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部副标题条 -->
+    <div id="subtitle-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:900;padding:10px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.85));pointer-events:none;">
+        <div id="subtitle-text" style="color:#fff;font-size:13px;line-height:1.6;text-align:center;text-shadow:0 1px 4px rgba(0,0,0,0.7);max-height:60px;overflow:hidden;"></div>
+    </div>
+
+    <!-- 通用状态提示（供 JS 复用） -->
+    <template id="tpl-loading">
+        <div style="text-align:center;padding:20px;color:#888;">加载中...</div>
+    </template>
+    <template id="tpl-empty">
+        <div style="text-align:center;padding:20px;color:#888;">暂无数据</div>
+    </template>
+    <template id="tpl-error">
+        <div style="text-align:center;padding:20px;color:#f55;">加载失败</div>
+    </template>
+
+    <!-- 小奥收藏 -->
+    <template id="tpl-markit-empty">
+        <div style="text-align:center;padding:20px;color:#888;">暂无收藏</div>
+    </template>
+    <template id="tpl-markit-form">
+        <div style="display:flex;gap:6px;">
+            <button id="markit-add-btn" style="padding:6px 12px;border-radius:4px;border:none;background:rgba(100,180,255,0.7);color:#fff;cursor:pointer;font-size:12px;flex-shrink:0;">添加收藏</button>
+            <input id="markit-url" type="text" placeholder="输入文章 URL" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+        </div>
+    </template>
+
+    <!-- 提醒待办 -->
+    <template id="tpl-reminder-category-item">
+        <div class="reminder-cat-item" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border-radius:8px;background:rgba(255,255,255,0.05);cursor:pointer;transition:background 0.2s;">
+            <span style="font-size:28px;"></span>
+            <span style="color:#ccc;font-size:11px;text-align:center;word-break:break-all;"></span>
+        </div>
+    </template>
+    <template id="tpl-reminder-empty">
+        <div style="text-align:center;padding:20px;color:#888;">该类别暂无提醒</div>
+    </template>
+    <template id="tpl-reminder-hint">
+        <div style="color:#888;font-size:11px;text-align:center;padding-bottom:8px;">点击类别图标查看该类别的提醒</div>
+    </template>
+    <template id="tpl-reminder-form">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:6px;align-items:center;">
+                <select id="reminder-category" style="flex-shrink:0;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;max-width:100px;"></select>
+                <input id="reminder-title" type="text" placeholder="提醒标题" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+            </div>
+            <button id="reminder-toggle-more" type="button" style="padding:2px 0;border:none;background:transparent;color:#888;cursor:pointer;font-size:11px;text-align:left;">▼ 更多选项</button>
+            <div id="reminder-more" style="display:none;flex-direction:column;gap:6px;">
+                <textarea id="reminder-content" placeholder="提醒内容（可选）" rows="3" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;resize:vertical;font-family:inherit;"></textarea>
+                <div style="display:flex;gap:6px;">
+                    <input id="reminder-date" type="date" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                    <input id="reminder-time" type="time" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <select id="reminder-repeat" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                    <option value="once">一次性</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option>
+                </select>
+                <select id="reminder-calendar" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                    <option value="solar">公历</option><option value="lunar">农历</option>
+                </select>
+            </div>
+            <button id="reminder-add-btn" style="padding:6px 0;border-radius:4px;border:none;background:rgba(100,180,255,0.7);color:#fff;cursor:pointer;font-size:12px;">添加提醒</button>
+        </div>
+    </template>
+    <template id="tpl-reminder-edit-form">
+        <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;">
+            <div style="display:flex;gap:6px;align-items:center;">
+                <select id="edit-reminder-category" style="flex-shrink:0;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;max-width:100px;"></select>
+                <input id="edit-reminder-title" type="text" placeholder="提醒标题" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+            </div>
+            <textarea id="edit-reminder-content" placeholder="提醒内容（可选）" rows="4" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;resize:vertical;font-family:inherit;"></textarea>
+            <div style="display:flex;gap:6px;">
+                <input id="edit-reminder-date" type="date" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                <input id="edit-reminder-time" type="time" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+            </div>
+            <select id="edit-reminder-repeat" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                <option value="once">一次性</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option>
+            </select>
+            <select id="edit-reminder-calendar" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                <option value="solar">公历</option><option value="lunar">农历</option>
+            </select>
+        </div>
+    </template>
+    <template id="tpl-reminder-edit-buttons">
+        <div style="display:flex;gap:6px;">
+            <button id="edit-reminder-cancel" style="flex:1;padding:7px 0;border-radius:4px;border:none;background:rgba(120,120,120,0.5);color:#fff;cursor:pointer;font-size:12px;">取消</button>
+            <button id="edit-reminder-save" style="flex:1;padding:7px 0;border-radius:4px;border:none;background:rgba(76,175,80,0.7);color:#fff;cursor:pointer;font-size:12px;">保存</button>
+        </div>
+    </template>
+
+    <!-- MCP 工具 -->
+    <template id="tpl-mcp-empty">
+        <div style="text-align:center;padding:20px;color:#888;">暂无技能</div>
+    </template>
+    <template id="tpl-mcp-item">
+        <div class="mcp-tool-item" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;gap:10px;cursor:pointer;">
+            <span style="font-size:20px;"></span>
+            <div style="flex:1;min-width:0;">
+                <div class="mcp-tool-desc" style="color:#eee;font-size:13px;"></div>
+                <div class="mcp-tool-name" style="color:#888;font-size:11px;"></div>
+            </div>
+        </div>
+    </template>
+
+    <!-- MCP 工具调用对话框 -->
+    <template id="tpl-mcp-call-dialog">
+        <div class="mcp-call-dialog" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:600;display:flex;align-items:center;justify-content:center;">
+            <div style="background:#2a2a2a;border:1px solid rgba(255,255,255,0.2);border-radius:10px;width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <span class="mcp-call-title" style="color:#eee;font-size:14px;font-weight:500;">调用工具</span>
+                    <span class="mcp-call-close" style="cursor:pointer;color:#999;font-size:18px;line-height:1;">×</span>
+                </div>
+                <div class="mcp-call-body" style="flex:1;overflow-y:auto;padding:12px 14px;">
+                    <div class="mcp-call-desc" style="color:#888;font-size:12px;margin-bottom:12px;line-height:1.5;"></div>
+                    <div class="mcp-call-params" style="display:flex;flex-direction:column;gap:10px;"></div>
+                </div>
+                <div style="padding:12px 14px;border-top:1px solid rgba(255,255,255,0.1);">
+                    <button class="mcp-call-submit" style="width:100%;padding:8px 0;border-radius:4px;border:none;background:rgba(76,175,80,0.8);color:#fff;cursor:pointer;font-size:13px;">调用</button>
+                </div>
+                <div class="mcp-call-result" style="display:none;max-height:200px;overflow-y:auto;padding:10px 14px;background:rgba(0,0,0,0.3);border-top:1px solid rgba(255,255,255,0.1);"></div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 定时任务 -->
+    <template id="tpl-schedule-empty">
+        <div style="text-align:center;padding:20px;color:#888;">暂无定时任务</div>
+    </template>
+    <template id="tpl-schedule-form">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:6px;align-items:center;">
+                <select id="schedule-task-type" style="flex-shrink:0;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;max-width:80px;">
+                    <option value="one_time" style="background:#1e1e1e;color:#fff;">一次性</option>
+                    <option value="recurring" style="background:#1e1e1e;color:#fff;">循环</option>
+                </select>
+                <input id="schedule-name" type="text" placeholder="任务名称" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+            </div>
+            <textarea id="schedule-description" rows="2" placeholder="任务描述（可选）" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;resize:vertical;"></textarea>
+            <select id="schedule-action-type" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;"></select>
+            <div id="schedule-params-container" style="display:flex;flex-direction:column;gap:4px;"></div>
+            <div id="schedule-time-section" style="display:flex;flex-direction:column;gap:6px;">
+                <input id="schedule-execute-at" type="datetime-local" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+            </div>
+            <div id="schedule-recurring-section" style="display:none;flex-direction:column;gap:6px;">
+                <div style="display:flex;gap:6px;">
+                    <select id="schedule-frequency" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                        <option value="daily" style="background:#1e1e1e;color:#fff;">每天</option>
+                        <option value="weekly" style="background:#1e1e1e;color:#fff;">每周</option>
+                        <option value="monthly" style="background:#1e1e1e;color:#fff;">每月</option>
+                        <option value="yearly" style="background:#1e1e1e;color:#fff;">每年</option>
+                    </select>
+                    <input id="schedule-interval" type="number" min="1" value="1" placeholder="间隔" style="width:50px;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                    <input id="schedule-time" type="time" value="08:00" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <div id="schedule-weekly-options" style="display:none;">
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="schedule-dow" value="1" style="accent-color:#64b4ff;">一
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="schedule-dow" value="2" style="accent-color:#64b4ff;">二
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="schedule-dow" value="3" style="accent-color:#64b4ff;">三
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="schedule-dow" value="4" style="accent-color:#64b4ff;">四
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="schedule-dow" value="5" style="accent-color:#64b4ff;">五
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="schedule-dow" value="6" style="accent-color:#64b4ff;">六
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="schedule-dow" value="7" style="accent-color:#64b4ff;">日
+                        </label>
+                    </div>
+                </div>
+                <div id="schedule-monthly-options" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;">
+                        每月 <input id="schedule-day-of-month" type="number" min="1" max="31" value="1" style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;"> 日
+                    </div>
+                </div>
+                <div id="schedule-yearly-options" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;">
+                        每年 <input id="schedule-month" type="number" min="1" max="12" value="1" style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;"> 月
+                        <input id="schedule-year-day" type="number" min="1" max="31" value="1" style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;"> 日
+                    </div>
+                </div>
+            </div>
+            <select id="schedule-timezone" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                <option value="UTC" style="background:#1e1e1e;color:#fff;">UTC</option>
+                <option value="Asia/Shanghai" style="background:#1e1e1e;color:#fff;" selected>Asia/Shanghai (中国标准时间)</option>
+                <option value="Asia/Tokyo" style="background:#1e1e1e;color:#fff;">Asia/Tokyo (日本时间)</option>
+                <option value="America/New_York" style="background:#1e1e1e;color:#fff;">America/New_York (纽约时间)</option>
+            </select>
+            <div style="display:flex;gap:6px;">
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                    <label style="color:#aaa;font-size:10px;">最大重试</label>
+                    <input id="schedule-max-retries" type="number" min="0" value="0" style="padding:5px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                    <label style="color:#aaa;font-size:10px;">重试间隔(秒)</label>
+                    <input id="schedule-retry-delay" type="number" min="1" value="60" style="padding:5px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                    <label style="color:#aaa;font-size:10px;">超时(秒)</label>
+                    <input id="schedule-timeout" type="number" min="1" placeholder="不限" style="padding:5px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+            </div>
+            <select id="schedule-notifier-id" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                <option value="" style="background:#1e1e1e;color:#fff;">-- 不通知 --</option>
+            </select>
+            <button id="schedule-add-btn" style="padding:6px 0;border-radius:4px;border:none;background:rgba(100,180,255,0.7);color:#fff;cursor:pointer;font-size:12px;">添加任务</button>
+        </div>
+    </template>
+    <template id="tpl-schedule-edit-form">
+        <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;">
+            <input id="edit-schedule-name" type="text" placeholder="任务名称" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+            <textarea id="edit-schedule-description" rows="2" placeholder="任务描述（可选）" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;resize:vertical;"></textarea>
+            <select id="edit-schedule-task-type" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                <option value="one_time" style="background:#1e1e1e;color:#fff;">一次性</option>
+                <option value="recurring" style="background:#1e1e1e;color:#fff;">循环</option>
+            </select>
+            <select id="edit-schedule-action-type" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;"></select>
+            <div id="edit-schedule-params-container" style="display:flex;flex-direction:column;gap:4px;"></div>
+            <div id="edit-schedule-time-section" style="display:flex;flex-direction:column;gap:6px;">
+                <input id="edit-schedule-execute-at" type="datetime-local" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+            </div>
+            <div id="edit-schedule-recurring-section" style="display:none;flex-direction:column;gap:6px;">
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <label style="color:#ff8a80;font-size:11px;white-space:nowrap;">下次执行</label>
+                    <input id="edit-schedule-next-run-at" type="datetime-local" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <select id="edit-schedule-frequency" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                        <option value="daily" style="background:#1e1e1e;color:#fff;">每天</option>
+                        <option value="weekly" style="background:#1e1e1e;color:#fff;">每周</option>
+                        <option value="monthly" style="background:#1e1e1e;color:#fff;">每月</option>
+                        <option value="yearly" style="background:#1e1e1e;color:#fff;">每年</option>
+                    </select>
+                    <input id="edit-schedule-interval" type="number" min="1" value="1" placeholder="间隔" style="width:50px;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                    <input id="edit-schedule-time" type="time" value="08:00" style="flex:1;padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <div id="edit-schedule-weekly-options" style="display:none;">
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="edit-schedule-dow" value="1" style="accent-color:#64b4ff;">一
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="edit-schedule-dow" value="2" style="accent-color:#64b4ff;">二
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="edit-schedule-dow" value="3" style="accent-color:#64b4ff;">三
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="edit-schedule-dow" value="4" style="accent-color:#64b4ff;">四
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="edit-schedule-dow" value="5" style="accent-color:#64b4ff;">五
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="edit-schedule-dow" value="6" style="accent-color:#64b4ff;">六
+                        </label>
+                        <label style="display:flex;align-items:center;gap:2px;color:#ccc;font-size:11px;cursor:pointer;">
+                            <input type="checkbox" class="edit-schedule-dow" value="7" style="accent-color:#64b4ff;">日
+                        </label>
+                    </div>
+                </div>
+                <div id="edit-schedule-monthly-options" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;">
+                        每月 <input id="edit-schedule-day-of-month" type="number" min="1" max="31" value="1" style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;"> 日
+                    </div>
+                </div>
+                <div id="edit-schedule-yearly-options" style="display:none;">
+                    <div style="display:flex;align-items:center;gap:6px;color:#ccc;font-size:11px;">
+                        每年 <input id="edit-schedule-month" type="number" min="1" max="12" value="1" style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;"> 月
+                        <input id="edit-schedule-year-day" type="number" min="1" max="31" value="1" style="width:50px;padding:4px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;"> 日
+                    </div>
+                </div>
+            </div>
+            <select id="edit-schedule-timezone" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                <option value="UTC" style="background:#1e1e1e;color:#fff;">UTC</option>
+                <option value="Asia/Shanghai" style="background:#1e1e1e;color:#fff;">Asia/Shanghai (中国标准时间)</option>
+                <option value="Asia/Tokyo" style="background:#1e1e1e;color:#fff;">Asia/Tokyo (日本时间)</option>
+                <option value="America/New_York" style="background:#1e1e1e;color:#fff;">America/New_York (纽约时间)</option>
+            </select>
+            <div style="display:flex;gap:6px;">
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                    <label style="color:#aaa;font-size:10px;">最大重试</label>
+                    <input id="edit-schedule-max-retries" type="number" min="0" value="0" style="padding:5px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                    <label style="color:#aaa;font-size:10px;">重试间隔(秒)</label>
+                    <input id="edit-schedule-retry-delay" type="number" min="1" value="60" style="padding:5px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+                    <label style="color:#aaa;font-size:10px;">超时(秒)</label>
+                    <input id="edit-schedule-timeout" type="number" min="1" placeholder="不限" style="padding:5px 6px;border-radius:4px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.3);color:#eee;font-size:12px;">
+                </div>
+            </div>
+            <select id="edit-schedule-notifier-id" style="padding:6px 8px;border-radius:4px;border:1px solid rgba(255,255,255,0.35);background:#1e1e1e;color:#fff;font-size:12px;">
+                <option value="" style="background:#1e1e1e;color:#fff;">-- 不通知 --</option>
+            </select>
+        </div>
+    </template>
+    <template id="tpl-schedule-edit-buttons">
+        <div style="display:flex;gap:6px;">
+            <button id="edit-schedule-cancel" style="flex:1;padding:7px 0;border-radius:4px;border:none;background:rgba(120,120,120,0.5);color:#fff;cursor:pointer;font-size:12px;">取消</button>
+            <button id="edit-schedule-save" style="flex:1;padding:7px 0;border-radius:4px;border:none;background:rgba(76,175,80,0.7);color:#fff;cursor:pointer;font-size:12px;">保存</button>
+        </div>
+    </template>
+
+    <!-- 设置面板 -->
+    <template id="tpl-settings-loading">
+        <div style="text-align:center;padding:20px;color:#888;">扫描模型中...</div>
+    </template>
+    <template id="tpl-settings-no-models">
+        <div style="text-align:center;padding:20px;color:#888;">未找到模型，请选择包含 Live2D 模型的目录</div>
+    </template>
+    <template id="tpl-settings-nav-item">
+        <div class="settings-nav-item" style="padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:background 0.15s;border-right:2px solid transparent;">
+            <span style="font-size:18px;"></span>
+            <span style="font-size:11px;"></span>
+        </div>
+    </template>
+
+    <script src="lib/live2dcubismcore.min.js"></script>
+    <script src="lib/pixi5.min.js"></script>
+    <script src="lib/cubism4.min.js"></script>
+    <script src="lib/qwebchannel.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (typeof qt !== 'undefined') {
+                new QWebChannel(qt.webChannelTransport, function(channel) {
+                    window.petAPI = channel.objects.petAPI;
+                });
+            }
+        });
+    </script>
+    
+    <!-- 桌宠模块 -->
+    <script src="lib/pet-common.js"></script>
+    <script src="lib/pet-core.js"></script>
+    <script src="lib/pet-radial-menu.js"></script>
+    <script src="lib/pet-chat.js"></script>
+    <script src="lib/pet-notifications.js"></script>
+    <script src="lib/pet-mcp.js"></script>
+    <script src="lib/pet-panels.js"></script>
+    <script src="lib/pet-settings.js"></script>
+    <script src="lib/pet-wander.js"></script>
+    <script src="pet.js"></script>
+</body>
+</html>
